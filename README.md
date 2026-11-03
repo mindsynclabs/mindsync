@@ -62,9 +62,3 @@ Stateless Design: No chat history is permanently persisted on server memory or e
 
 📜 License
 MIT License
-
-
----
-
-### Cách cập nhật nhanh:
-Bạn chỉ cần mở file `README.md` trong thư mục gốc dự án của bạn, **xóa toàn bộ nội dung cũ**, dán đoạn code phía trên vào và lưu lại (`Ctrl + S`). Kho mã nguồn của bạn sẽ sẵn sàng cho các bước phát triển tiếp theo!
