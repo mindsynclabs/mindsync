@@ -7,6 +7,8 @@ from src.modules.agents.tools.rag_tool import search_knowledge_base
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
 LLM_MODEL = os.getenv("LLM_MODEL", "qwen2.5:7b")
+# Bạn có thể thiết lập tham số runtime qua OllamaProvider hoặc biến môi trường Ollama
+os.environ["OLLAMA_NUM_PARALLEL"] = "2"
 
 # Configure provider with explicit base_url
 provider = OllamaProvider(base_url=OLLAMA_BASE_URL)

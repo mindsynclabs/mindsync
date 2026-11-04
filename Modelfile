@@ -1,0 +1,3 @@
+FROM /tmp/mindsync-0.5b.gguf
+PARAMETER num_ctx 2048
+SYSTEM "You are MindSync AI, a specialized local assistant."
