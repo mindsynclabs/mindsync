@@ -1,0 +1,52 @@
+api commands:
+curl -X 'POST' \
+  'http://localhost:8000/knowledge/upload' \
+  -H 'accept: */*' \
+  -H 'Content-Type: multipart/form-data' \
+  -F 'file=@derek do is living in.txt;type=text/plain' \
+  -F 'doc_id=string'
+
+
+  curl -X 'POST' \
+  'http://localhost:8000/chat' \
+  -H 'accept: */*' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "query": "where is derek do living?"
+}'
+
+
+curl -X 'POST' \
+  'http://localhost:8000/knowledge/ingest' \
+  -H 'accept: */*' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "doc_id": "doc_default",
+  "text": "an meo is living in ho chi minh city",
+  "metadata": {
+    "additionalProp1": {}
+  }
+}'
+
+verify the content: 
+curl -X 'POST' \
+  'http://localhost:8000/knowledge/ingest' \
+  -H 'accept: */*' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "doc_id": "doc_default",
+  "text": "dan thanh is a professional astronaut living on Mars, and her favorite food is space bricks",
+  "metadata": {
+    "additionalProp1": {}
+  }
+}'
+
+
+expected result:
+ curl -X 'POST' \
+  'http://localhost:8000/chat' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "query": "Where does dan thanh live and what does she eat?"
+}'
+{"status":"success","prompt":"Where does dan thanh live and what does she eat?","retrieved_context":"dan thanh is a professional astronaut living on Mars, and her favorite food is space bricks\nan meo is a doctor\nderek do is living in singapore, thang tran is living in vietnam\n","response":"DAN THANH lives on Mars and she eats space bricks."}
