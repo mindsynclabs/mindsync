@@ -1,52 +1,39 @@
-api commands:
-curl -X 'POST' \
-  'http://localhost:8000/knowledge/upload' \
-  -H 'accept: */*' \
-  -H 'Content-Type: multipart/form-data' \
-  -F 'file=@derek do is living in.txt;type=text/plain' \
-  -F 'doc_id=string'
+1. Ingest these (POST /documents/text)
 
+Document 1
 
-  curl -X 'POST' \
-  'http://localhost:8000/chat' \
-  -H 'accept: */*' \
-  -H 'Content-Type: application/json' \
-  -d '{
-  "query": "where is derek do living?"
-}'
+json
+{
+  "doc_id": "mindsync-notes",
+  "text": "MindSync is a personal knowledge assistant started in March 2026. It stores documents in a LanceDB database and uses the all-MiniLM-L6-v2 model to create embeddings. Documents are split into chunks of 256 tokens with an overlap of 32 tokens. MindSync accepts PDF, TXT and Markdown files. Scanned PDFs are read with an OCR model called qwen2.5vl. Every 30 minutes, MindSync saves a snapshot of the index to Filecoin so the data can be restored later. The project lead is Minh, and the weekly review meeting is every Friday at 9am.",
+  "metadata": {"source": "notes"}
+}
 
+Document 2 (a different topic, to test that retrieval picks the right one)
 
-curl -X 'POST' \
-  'http://localhost:8000/knowledge/ingest' \
-  -H 'accept: */*' \
-  -H 'Content-Type: application/json' \
-  -d '{
-  "doc_id": "doc_default",
-  "text": "an meo is living in ho chi minh city",
-  "metadata": {
-    "additionalProp1": {}
-  }
-}'
+json
+{
+  "doc_id": "bakery-menu",
+  "text": "Northwind Bakery opens at 7am and closes at 6pm, Monday to Saturday. It is closed on Sundays. The most popular item is the cardamom bun, which costs 3.50 dollars. A loaf of sourdough bread costs 6 dollars. Orders of more than 20 items need to be placed 48 hours in advance. The bakery was founded in 2019 by Elena Park.",
+  "metadata": {"source": "menu"}
+}
+2. Ask these (POST /chat)
 
-verify the content: 
-curl -X 'POST' \
-  'http://localhost:8000/knowledge/ingest' \
-  -H 'accept: */*' \
-  -H 'Content-Type: application/json' \
-  -d '{
-  "doc_id": "doc_default",
-  "text": "dan thanh is a professional astronaut living on Mars, and her favorite food is space bricks",
-  "metadata": {
-    "additionalProp1": {}
-  }
-}'
+Use "session_id": "s1" for all of them:
 
+Question	Expected answer
+What embedding model does MindSync use?	all-MiniLM-L6-v2
+How often does MindSync back up to Filecoin?	Every 30 minutes
+What is the chunk size?	256 tokens, with 32 overlap
+When is the weekly review meeting?	Friday at 9am
+What time does Northwind Bakery close?	6pm (closed Sundays)
+How much is a cardamom bun?	3.50 dollars
+Who founded the bakery?	Elena Park
 
-expected result:
- curl -X 'POST' \
-  'http://localhost:8000/chat' \
-  -H 'Content-Type: application/json' \
-  -d '{
-  "query": "Where does dan thanh live and what does she eat?"
-}'
-{"status":"success","prompt":"Where does dan thanh live and what does she eat?","retrieved_context":"dan thanh is a professional astronaut living on Mars, and her favorite food is space bricks\nan meo is a doctor\nderek do is living in singapore, thang tran is living in vietnam\n","response":"DAN THANH lives on Mars and she eats space bricks."}
+Extra tests
+
+Follow-up (memory): after “What is the chunk size?”, ask And how much do they overlap? in the same session. This only works if the chat remembers the previous turn.
+Unanswerable: ask What is the capital of France? or Who is the CEO of Northwind Bakery?. A good setup says it doesn’t know. A 0.5B model may answer anyway, which tells you how much to trust it.
+Multi-document: ask Which one is closed on Sundays?, which should pick the bakery.
+
+Check the sources field in each response. For the MindSync questions it should list mindsync-notes, and for the bakery questions bakery-menu. If the sources are right but the answer is wrong, the retrieval is working and the LLM is the weak part. In that case, try a bigger model, such as OLLAMA_MODEL=qwen2.5:1.5b.
