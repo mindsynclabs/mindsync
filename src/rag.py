@@ -1,10 +1,12 @@
 """Core RAG logic: LlamaIndex + LanceDB + Ollama (local LLM)."""
 import json
+import logging
 import os
 from typing import Any, Dict
 
 import lancedb
 from llama_index.core import Document, Settings, VectorStoreIndex
+from llama_index.core.chat_engine import SimpleChatEngine
 from llama_index.core.memory import ChatMemoryBuffer
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -15,6 +17,8 @@ from llama_index.vector_stores.lancedb import LanceDBVectorStore
 DB_PATH = os.getenv("DB_PATH", "./lancedb_data")
 TABLE_NAME = os.getenv("TABLE_NAME", "rag_documents")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+# None = auto-detect (GPU if PyTorch can see one, otherwise CPU). Or "cpu" / "cuda" / "mps".
+EMBED_DEVICE = os.getenv("EMBED_DEVICE") or None
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:0.5b")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 # "context" = 1 LLM call per message (faster on CPU, weaker on follow-ups)
@@ -22,13 +26,32 @@ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 CHAT_MODE = os.getenv("CHAT_MODE", "condense_plus_context")
 TOP_K = int(os.getenv("TOP_K", "3"))
 
-SYSTEM_PROMPT = (
+# "hybrid" = use the documents when they are relevant, otherwise answer from the
+#            LLM's own general knowledge (and say the documents don't cover it)
+# "strict" = answer ONLY from the documents; otherwise say "I don't know"
+ANSWER_MODE = os.getenv("ANSWER_MODE", "hybrid")
+# Optional routing for hybrid mode: if the best retrieval score is below this value,
+# skip the documents and ask the LLM directly. 0 = off (the prompt alone decides).
+# Check the "score" values in /chat responses for relevant vs unrelated questions to pick a value.
+MIN_SCORE = float(os.getenv("MIN_SCORE", "0"))
+
+STRICT_PROMPT = (
     "You are a helpful assistant. Answer using ONLY the provided context. "
     "If the context does not contain the answer, say you don't know. Be concise."
 )
+HYBRID_PROMPT = (
+    "You are a helpful assistant. You are given context from the user's documents. "
+    "If the context is relevant to the question, use it. "
+    "If it is not relevant, ignore it and answer from your own general knowledge, "
+    "starting your answer with 'Not found in your documents.' Be concise."
+)
+GENERAL_PROMPT = "You are a helpful assistant. Be concise."
+SYSTEM_PROMPT = STRICT_PROMPT if ANSWER_MODE == "strict" else HYBRID_PROMPT
+
+log = logging.getLogger("rag")
 
 # ---- LlamaIndex global settings ----------------------------------------------
-Settings.embed_model = HuggingFaceEmbedding(model_name=EMBED_MODEL)
+Settings.embed_model = HuggingFaceEmbedding(model_name=EMBED_MODEL, device=EMBED_DEVICE)
 Settings.llm = Ollama(
     model=OLLAMA_MODEL,
     base_url=OLLAMA_URL,
@@ -97,22 +120,48 @@ def has_documents() -> bool:
         return False
 
 
-def _get_engine(session_id: str):
+def _get_session(session_id: str) -> Dict[str, Any]:
+    """Per session: one shared memory, a document-grounded engine and a plain LLM engine."""
     if session_id not in _sessions:
         memory = ChatMemoryBuffer.from_defaults(token_limit=1500)
-        _sessions[session_id] = index.as_chat_engine(
-            chat_mode=CHAT_MODE,
-            memory=memory,
-            system_prompt=SYSTEM_PROMPT,
-            similarity_top_k=TOP_K,
-        )
+        _sessions[session_id] = {
+            "rag": index.as_chat_engine(
+                chat_mode=CHAT_MODE,
+                memory=memory,
+                system_prompt=SYSTEM_PROMPT,
+                similarity_top_k=TOP_K,
+            ),
+            "general": SimpleChatEngine.from_defaults(
+                llm=Settings.llm, memory=memory, system_prompt=GENERAL_PROMPT
+            ),
+        }
     return _sessions[session_id]
 
 
+def _documents_are_relevant(message: str) -> bool:
+    """Hybrid routing: is the best retrieved chunk close enough to be worth using?"""
+    if MIN_SCORE <= 0:
+        return True  # routing off: always retrieve, let the prompt decide
+    nodes = index.as_retriever(similarity_top_k=1).retrieve(message)
+    top = nodes[0].score if nodes and nodes[0].score is not None else None
+    log.info("top retrieval score %s (MIN_SCORE %s)", top, MIN_SCORE)
+    return top is not None and top >= MIN_SCORE
+
+
 def chat(session_id: str, message: str) -> Dict[str, Any]:
-    if not has_documents():
+    docs_exist = has_documents()
+    if not docs_exist and ANSWER_MODE == "strict":
         raise EmptyIndexError("No documents ingested yet.")
-    response = _get_engine(session_id).chat(message)
+
+    session = _get_session(session_id)
+    use_docs = docs_exist and (ANSWER_MODE == "strict" or _documents_are_relevant(message))
+
+    if not use_docs:
+        # No documents, or nothing relevant: the LLM answers from its own knowledge.
+        response = session["general"].chat(message)
+        return {"answer": str(response), "sources": [], "grounded": False}
+
+    response = session["rag"].chat(message)
     sources = [
         {
             "doc_id": n.node.ref_doc_id,
@@ -122,7 +171,7 @@ def chat(session_id: str, message: str) -> Dict[str, Any]:
         }
         for n in response.source_nodes
     ]
-    return {"answer": str(response), "sources": sources}
+    return {"answer": str(response), "sources": sources, "grounded": True}
 
 
 def reset_session(session_id: str) -> None:

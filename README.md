@@ -117,7 +117,8 @@ mindsync/
 ├── src/
 │   ├── main.py        # FastAPI app and endpoints
 │   ├── rag.py         # LlamaIndex + LanceDB + Ollama: ingest and chat
-│   └── ocr.py         # PDF text extraction with vision-model OCR fallback
+│   ├── ocr.py         # PDF text extraction with vision-model OCR fallback
+│   └── telegram_service.py  # optional Telegram bot inside the FastAPI app
 ├── requirements.txt
 ├── lancedb_data/      # created on first ingest (the vector database)
 └── README.md
@@ -194,6 +195,52 @@ Example:
 OLLAMA_MODEL=qwen2.5:1.5b CHAT_MODE=context OCR_DPI=100 \
   python -m uvicorn main:app --app-dir src --reload
 ```
+
+## Telegram (optional)
+
+You can chat with your documents from Telegram. The bot lives **inside the FastAPI app** (`src/telegram_service.py`): one process, and it calls the same RAG functions as the HTTP endpoints. It stays off unless you set a bot token.
+
+**What you can do in Telegram**
+- Send a text message to ask a question (each Telegram chat has its own conversation memory)
+- Send a PDF, `.txt` or `.md` file to add it (a caption becomes the `doc_id`)
+- `/reset` clears the conversation memory, `/delete <doc_id>` removes a document, `/help` lists the commands
+
+**Setup**
+1. In Telegram, talk to **@BotFather**, send `/newbot`, and copy the token.
+2. Start the app with the token set. The bot is locked until you allow your user id, and it will tell you your id when you message it:
+   ```bash
+   export TELEGRAM_BOT_TOKEN="123456:ABC..."
+   python -m uvicorn main:app --app-dir src
+   ```
+3. Message the bot, copy the user id it replies with, then restart with it allowed:
+   ```bash
+   export TELEGRAM_ALLOWED_IDS="11111111"      # comma-separated for several people
+   ```
+
+**Two modes (`TELEGRAM_MODE`)**
+
+| Mode | How it works | Needs |
+|---|---|---|
+| `polling` (default) | The app asks Telegram for new messages in the background | Nothing public. Works behind a home router. Use a single uvicorn worker |
+| `webhook` | Telegram calls `POST /telegram/webhook` on your FastAPI app | A public HTTPS URL (a server, or a tunnel such as Cloudflare Tunnel or ngrok) |
+
+Webhook mode also needs:
+```bash
+export TELEGRAM_MODE=webhook
+export TELEGRAM_WEBHOOK_URL="https://your-public-host"
+export TELEGRAM_WEBHOOK_SECRET="a-long-random-string"   # checked on every call
+```
+
+`GET /telegram/status` shows whether the bot is running and in which mode.
+
+**Security**
+- Keep the token secret and out of git. If it leaks, revoke it with `/revoke` in @BotFather.
+- Only user ids in `TELEGRAM_ALLOWED_IDS` get answers. Everyone else is ignored, and groups and channels are ignored too.
+- Messages and files pass through Telegram's servers. The LLM, embeddings and database stay local.
+
+**Limits:** replies are split at 4000 characters, and Telegram bots can download files up to 20 MB. Scanned PDFs can take minutes on CPU, so the bot shows "typing..." while it works.
+
+`telegram_bot.py` is an alternative: a standalone script that talks to the API over HTTP, for running the bot as a separate process or on another machine. Use one or the other, not both with the same token.
 
 ## Extending the project
 
@@ -302,6 +349,7 @@ Implemented in this lab: text insert, file upload, PDF OCR fallback, chat with m
 
 Not implemented yet (see [Extending the project](#extending-the-project)):
 
+- [x] Telegram bot (optional, inside the FastAPI app; untested in this lab)
 - [ ] Streaming chat endpoint (`/chat/stream`)
 - [ ] Background ingestion jobs with status polling
 - [ ] Faster OCR path (Tesseract first, vision model as fallback)

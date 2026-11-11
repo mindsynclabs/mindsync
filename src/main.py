@@ -1,16 +1,28 @@
 import hashlib
+from contextlib import asynccontextmanager
 from typing import Any, Dict, Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
-import src.ocr as ocr
-import src.rag as rag
+import ocr
+import rag
+import telegram_service
+
+# Telegram runs inside this app. It is off unless TELEGRAM_BOT_TOKEN is set.
+telegram_service.configure(rag, ocr)
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await telegram_service.startup()
+    yield
+    await telegram_service.shutdown()
 
-app = FastAPI(title="RAG Prototype")
+
+app = FastAPI(title="RAG Prototype", lifespan=lifespan)
+app.include_router(telegram_service.router)
 
 
 # ---- Schemas -------------------------------------------------------------------
@@ -92,6 +104,12 @@ async def chat(body: ChatIn):
         raise HTTPException(400, "Message cannot be empty.")
     try:
         return await run_in_threadpool(rag.chat, body.session_id, body.message)
+    except rag.EmptyIndexError:
+        raise HTTPException(
+            409,
+            "No documents yet. Add some first via POST /documents/text "
+            "or POST /documents/upload, then chat.",
+        )
     except Exception as e:
         raise HTTPException(
             502, f"Chat failed (is Ollama running and the model pulled?): {e}"
