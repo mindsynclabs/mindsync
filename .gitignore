@@ -19,3 +19,8 @@ output
 # IDEs
 .vscode/
 .idea/
+
+# test & notes
+tests/
+test.py
+notes.txt
