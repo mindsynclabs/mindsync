@@ -1,0 +1,5 @@
+An is male. An works as a backend engineer at Zentora Labs in Da Nang.
+Binh is female. Binh is the head of design at Zentora Labs and has worked there for 6 years.
+Cuong is male. Cuong leads the data team and his favorite programming language is Rust.
+Dung is female. Dung is the finance manager and she joined Zentora Labs in March 2022.
+Hoa is female. Hoa is a security engineer and she owns a cat named Mochi.
