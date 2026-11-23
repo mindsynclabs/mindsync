@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field
 import ocr
 import rag
 import telegram_service
+from typing import Any, Dict, List
+
 
 # Telegram runs inside this app. It is off unless TELEGRAM_BOT_TOKEN is set.
 telegram_service.configure(rag, ocr)
@@ -38,6 +40,13 @@ class ChatIn(BaseModel):
     session_id: str = "default"
 
 
+# 1) Model phải nằm TRƯỚC route
+class DocIn(BaseModel):
+    doc_id: str = Field(..., min_length=1)
+    text: str
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
 # ---- Helpers -------------------------------------------------------------------
 def extract_text(filename: str, content: bytes) -> str:
     name = filename.lower()
@@ -60,7 +69,7 @@ def health():
     return {"status": "ok", "llm": rag.OLLAMA_MODEL, "embed": rag.EMBED_MODEL}
 
 
-@app.post("/documents/text")
+@app.post("/documents/ingest")
 async def insert_text(body: TextIn):
     if not body.text.strip():
         raise HTTPException(400, "Text cannot be empty.")
@@ -69,6 +78,17 @@ async def insert_text(body: TextIn):
     )
     return {"status": "success", "doc_id": body.doc_id, "chunks": chunks}
 
+
+
+@app.post("/documents/ingest/batch")
+def ingest(docs: List[DocIn]):   # body là một mảng
+    if not docs:
+        raise HTTPException(status_code=400, detail="docs is empty")
+    try:
+        result = rag.ingest_documents([d.model_dump() for d in docs])
+    except ValueError as e:      # lỗi validate_docs (trùng doc_id, thiếu text...)
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ingested": result, "total_chunks": sum(result.values())}
 
 @app.post("/documents/upload")
 async def upload_file(

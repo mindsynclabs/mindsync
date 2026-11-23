@@ -343,6 +343,18 @@ What it does not do: storage proofs show that data is stored and unchanged, not 
 | OCR error about the model | `ollama pull qwen2.5vl:7b`, and update Ollama if the pull is refused |
 | Scanned PDF returns "No text found" | Check `PDF_OCR` is not `off`, and that the OCR model is pulled |
 
+## Run fine-tune
+
+```bash
+python src/fine-tune.py --data-path ./sample_data/fine_tune_data_set.jsonl --epochs 20 --batch-size 2 --grad-ac
+cum-steps 2 --lr 3e-4 --output-dir ./lora_adapter
+```
+## Verify trained data
+
+```bash
+python src/verify-fine-tune.py --adapter-dir ./lora_adapter
+```
+
 ## Roadmap
 
 Implemented in this lab: text insert, file upload, PDF OCR fallback, chat with memory and sources, document delete.

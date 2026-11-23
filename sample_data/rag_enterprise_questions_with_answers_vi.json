@@ -1,0 +1,218 @@
+[
+  {
+    "id": "Q01",
+    "question": "Giờ hỗ trợ tiêu chuẩn là mấy giờ và theo múi giờ nào?",
+    "expected_answer": "Thứ Hai đến thứ Sáu, 08:00–18:00 giờ Việt Nam (UTC+7), không gồm ngày nghỉ lễ công ty công bố.",
+    "expected_doc_ids": [
+      "DOC-001"
+    ],
+    "type": "lookup"
+  },
+  {
+    "id": "Q02",
+    "question": "Toàn bộ dịch vụ chính ngừng, phần lớn người dùng không truy cập được và không có cách tạm thời. Mức ưu tiên nào phù hợp?",
+    "expected_answer": "P1 — Nghiêm trọng.",
+    "expected_doc_ids": [
+      "DOC-001"
+    ],
+    "type": "scenario"
+  },
+  {
+    "id": "Q03",
+    "question": "Khách gói Ưu tiên có sự cố P2 thì mục tiêu phản hồi ban đầu là bao lâu?",
+    "expected_answer": "2 giờ làm việc; đây là mục tiêu phản hồi ban đầu, không phải thời gian khắc phục.",
+    "expected_doc_ids": [
+      "DOC-001"
+    ],
+    "type": "lookup_caveat"
+  },
+  {
+    "id": "Q04",
+    "question": "Tôi cần gửi gì trong phiếu hỗ trợ? Có được đính kèm mật khẩu và dữ liệu khách hàng không?",
+    "expected_answer": "Cung cấp tổ chức/mã khách hàng, sản phẩm/môi trường/khu vực, thời điểm và bước tái hiện, mã lỗi/correlation ID, số người ảnh hưởng và giải pháp đã thử. Không gửi mật khẩu, MFA, thẻ thanh toán hay dữ liệu nhạy cảm qua kênh thường.",
+    "expected_doc_ids": [
+      "DOC-001"
+    ],
+    "type": "list_and_safety"
+  },
+  {
+    "id": "Q05",
+    "question": "Dữ liệu của chúng tôi chắc chắn chỉ nằm ở Singapore chứ?",
+    "expected_answer": "Không thể kết luận chỉ từ tài liệu này: dữ liệu production chủ yếu ở Singapore nhưng một số dịch vụ phụ trợ có thể xử lý metadata ở khu vực khác. Cam kết một quốc gia cần phụ lục đã ký.",
+    "expected_doc_ids": [
+      "DOC-002"
+    ],
+    "type": "caveat"
+  },
+  {
+    "id": "Q06",
+    "question": "Backup giữ bao lâu? RTO chung là bao nhiêu?",
+    "expected_answer": "Backup vận hành giữ tối đa 35 ngày. Tài liệu không đưa ra RTO/RPO chung; giá trị nếu có nằm trong hợp đồng dịch vụ.",
+    "expected_doc_ids": [
+      "DOC-002"
+    ],
+    "type": "multi_fact_abstention"
+  },
+  {
+    "id": "Q07",
+    "question": "Hết hợp đồng thì trong bao lâu phải yêu cầu xuất dữ liệu và khi nào xóa production?",
+    "expected_answer": "Có 45 ngày để yêu cầu xuất (trừ hợp đồng quy định khác); sau đó production được xóa trong vòng 30 ngày.",
+    "expected_doc_ids": [
+      "DOC-002"
+    ],
+    "type": "multi_hop"
+  },
+  {
+    "id": "Q08",
+    "question": "Gói Tăng trưởng bao gồm bao nhiêu người dùng và giữ audit log bao lâu?",
+    "expected_answer": "100 người dùng và log kiểm toán 90 ngày.",
+    "expected_doc_ids": [
+      "DOC-003"
+    ],
+    "type": "table_lookup"
+  },
+  {
+    "id": "Q09",
+    "question": "Công ty có gói Doanh nghiệp thì mặc nhiên được hỗ trợ Ưu tiên không?",
+    "expected_answer": "Không. Chỉ có nếu đơn hàng đã ký ghi rõ quyền lợi hỗ trợ Ưu tiên.",
+    "expected_doc_ids": [
+      "DOC-003"
+    ],
+    "type": "table_caveat"
+  },
+  {
+    "id": "Q10",
+    "question": "Có 110 người dùng hoạt động trong tháng ở gói Tăng trưởng. Phí vượt mức theo chính sách là bao nhiêu?",
+    "expected_answer": "10 người vượt mức × 180.000 VND = 1.800.000 VND cho tháng đó, tính theo mức người dùng hoạt động cao nhất.",
+    "expected_doc_ids": [
+      "DOC-003"
+    ],
+    "type": "calculation"
+  },
+  {
+    "id": "Q11",
+    "question": "Hóa đơn đến hạn khi nào? Nếu tranh chấp một phần thì có thể giữ lại toàn bộ không?",
+    "expected_answer": "Đến hạn sau 30 ngày từ ngày phát hành, trừ khi đơn hàng quy định khác. Phần không tranh chấp vẫn phải thanh toán.",
+    "expected_doc_ids": [
+      "DOC-003"
+    ],
+    "type": "multi_fact"
+  },
+  {
+    "id": "Q12",
+    "question": "Không muốn gia hạn thì báo trước bao lâu?",
+    "expected_answer": "Ít nhất 60 ngày trước ngày gia hạn, trừ khi hợp đồng quy định khác.",
+    "expected_doc_ids": [
+      "DOC-003"
+    ],
+    "type": "lookup_caveat"
+  },
+  {
+    "id": "Q13",
+    "question": "API có giới hạn mặc định bao nhiêu request mỗi phút? Khi bị 429 cần đọc gì?",
+    "expected_answer": "120 yêu cầu/phút/tổ chức theo giới hạn mặc định; đọc header Retry-After để biết số giây cần chờ. Endpoint riêng có thể thấp hơn.",
+    "expected_doc_ids": [
+      "DOC-004"
+    ],
+    "type": "technical_lookup"
+  },
+  {
+    "id": "Q14",
+    "question": "Webhook gửi lại mấy lần, mỗi lần cách nhau bao lâu, endpoint phải phản hồi trong bao lâu?",
+    "expected_answer": "Tối đa 5 lần, cách nhau 30 giây; endpoint phải trả 2xx trong 10 giây.",
+    "expected_doc_ids": [
+      "DOC-004"
+    ],
+    "type": "multi_fact"
+  },
+  {
+    "id": "Q15",
+    "question": "Tại sao xác minh HMAC thất bại sau khi parse JSON rồi serialize lại?",
+    "expected_answer": "Vì chữ ký được tính trên raw request body; parse và serialize lại có thể thay đổi nội dung byte và làm chữ ký không khớp.",
+    "expected_doc_ids": [
+      "DOC-004"
+    ],
+    "type": "technical_reasoning"
+  },
+  {
+    "id": "Q16",
+    "question": "Trong code Python, số lần thử tối đa là bao nhiêu và timeout request là bao lâu?",
+    "expected_answer": "5 lần thử và timeout 10 giây.",
+    "expected_doc_ids": [
+      "DOC-004"
+    ],
+    "type": "code_block"
+  },
+  {
+    "id": "Q17",
+    "question": "API rate limit là bao nhiêu ở mọi endpoint?",
+    "expected_answer": "Tài liệu chỉ nêu mặc định 120 yêu cầu/phút/tổ chức; một số endpoint có giới hạn thấp hơn. Không có một con số áp dụng cho mọi endpoint.",
+    "expected_doc_ids": [
+      "DOC-004"
+    ],
+    "type": "abstention_caveat"
+  },
+  {
+    "id": "Q18",
+    "question": "IT phải khóa đăng nhập công ty trong bao lâu khi nhân viên nghỉ việc đột xuất?",
+    "expected_answer": "Trong vòng 4 giờ làm việc kể từ khi nhận yêu cầu đã xác thực.",
+    "expected_doc_ids": [
+      "DOC-005"
+    ],
+    "type": "lookup"
+  },
+  {
+    "id": "Q19",
+    "question": "Tài khoản mới có quyền production mặc định không?",
+    "expected_answer": "Không. Tài khoản mặc định không có quyền production; quyền nhạy cảm cần chủ hệ thống phê duyệt.",
+    "expected_doc_ids": [
+      "DOC-005"
+    ],
+    "type": "negative_fact"
+  },
+  {
+    "id": "Q20",
+    "question": "Máy nhân viên phải khóa màn hình sau tối đa bao lâu và cài bản vá quan trọng trong bao lâu?",
+    "expected_answer": "Khóa sau tối đa 5 phút không hoạt động; cài bản vá quan trọng trong vòng 14 ngày từ khi phát hành.",
+    "expected_doc_ids": [
+      "DOC-006"
+    ],
+    "type": "multi_fact"
+  },
+  {
+    "id": "Q21",
+    "question": "Điện thoại cá nhân có thể tải dữ liệu khách hàng để làm việc không?",
+    "expected_answer": "Không. Thiết bị cá nhân chỉ được truy cập email qua ứng dụng được quản lý và không được tải dữ liệu khách hàng xuống.",
+    "expected_doc_ids": [
+      "DOC-006"
+    ],
+    "type": "policy"
+  },
+  {
+    "id": "Q22",
+    "question": "Nếu laptop thất lạc ngoài giờ thì báo cho ai và số nào?",
+    "expected_answer": "Báo Security Operations; ngoài giờ gọi +84 28 5550 0199.",
+    "expected_doc_ids": [
+      "DOC-006"
+    ],
+    "type": "lookup"
+  },
+  {
+    "id": "Q23",
+    "question": "Sau 5 lần webhook thất bại thì sự kiện tự gửi tiếp mãi không?",
+    "expected_answer": "Không. Sau lần thử cuối, sự kiện vào hàng đợi lỗi và quản trị viên phải yêu cầu gửi lại trong Console.",
+    "expected_doc_ids": [
+      "DOC-004"
+    ],
+    "type": "negative_fact"
+  },
+  {
+    "id": "Q24",
+    "question": "Footer ghi phiên bản chính sách ngày nào? Có nên xem đó là ngày hiện hành của mọi chính sách không?",
+    "expected_answer": "Footer của DOC-006 ghi 2025-02-01. Không thể suy ra ngày đó áp dụng cho mọi tài liệu/chính sách.",
+    "expected_doc_ids": [
+      "DOC-006"
+    ],
+    "type": "noise_and_scope"
+  }
+]

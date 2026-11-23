@@ -258,7 +258,6 @@ def embed_query(text: str) -> List[float]:
     """Vector for a question (handy for debugging scores outside the engines)."""
     return Settings.embed_model.get_query_embedding(text)
 
-
 # =============================================================================
 # 7. STORAGE + THE INGEST PIPELINE
 # =============================================================================
@@ -273,22 +272,59 @@ def store_nodes(nodes: list) -> None:
     index.insert_nodes(nodes)
 
 
-def ingest_text(doc_id: str, text: str, metadata: Dict[str, Any]) -> int:
-    """Normalize, chunk, embed and store text. Re-ingesting a doc_id replaces its chunks."""
-    delete_document(doc_id)
+def validate_docs(docs: List[Dict[str, Any]]) -> None:
+    """Check the whole array BEFORE touching the DB, so a bad item can't leave a half-done ingest."""
+    if not isinstance(docs, list):
+        raise ValueError("docs must be a list of {doc_id, text, metadata}")
+    seen = set()
+    for i, d in enumerate(docs):
+        if not isinstance(d, dict) or not d.get("doc_id") or not isinstance(d.get("text"), str):
+            raise ValueError(f"docs[{i}] needs a 'doc_id' and a string 'text'")
+        if d["doc_id"] in seen:
+            raise ValueError(f"duplicate doc_id {d['doc_id']!r} at docs[{i}]")
+        seen.add(d["doc_id"])
+
+
+def prepare_nodes(doc_id: str, text: str, metadata: Dict[str, Any]) -> list:
+    """One document -> chunks (normalize -> document -> chunk). No DB access."""
     if NORMALIZE_TEXT:
         text = normalize_text(text)
     metadata = normalize_metadata(metadata)
-
-    nodes = chunk_document(make_document(doc_id, text, metadata))
-    if not nodes:
-        return 0
-    if EMBED_EXPLICIT:
-        nodes = embed_nodes(nodes)
-    store_nodes(nodes)
-    return len(nodes)
+    return chunk_document(make_document(doc_id, text, metadata))
 
 
+def ingest_documents(docs: List[Dict[str, Any]]) -> Dict[str, int]:
+    """Ingest an array of documents: [{"doc_id": str, "text": str, "metadata": {...}}, ...]
+
+    Returns {doc_id: number_of_chunks}. Re-ingesting a doc_id replaces its chunks.
+    """
+    validate_docs(docs)
+
+    # 1) chunk every document, then embed ALL chunks in one batch.
+    #    Nothing has been deleted yet, so a failure here leaves the DB untouched.
+    nodes_by_doc: Dict[str, list] = {
+        d["doc_id"]: prepare_nodes(d["doc_id"], d["text"], d.get("metadata") or {})
+        for d in docs
+    }
+    all_nodes = [n for nodes in nodes_by_doc.values() for n in nodes]
+    if EMBED_EXPLICIT and all_nodes:
+        embed_nodes(all_nodes)  # sets node.embedding in place
+
+    # 2) replace the old chunks, then write everything with a single insert
+    for doc_id in nodes_by_doc:
+        delete_document(doc_id)
+    if all_nodes:
+        store_nodes(all_nodes)
+
+    return {doc_id: len(nodes) for doc_id, nodes in nodes_by_doc.items()}
+
+
+def ingest_text(doc_id: str, text: str, metadata: Dict[str, Any]) -> int:
+    """Single-document wrapper (unchanged API for the web app)."""
+    result = ingest_documents([{"doc_id": doc_id, "text": text, "metadata": metadata}])
+    return result[doc_id]
+
+    
 # =============================================================================
 # 8. RETRIEVAL + RE-RANKING
 # =============================================================================
