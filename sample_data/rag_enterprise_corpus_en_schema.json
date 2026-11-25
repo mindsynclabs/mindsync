@@ -1,0 +1,62 @@
+[
+  {
+    "doc_id": "DOC-001",
+    "text": "### 1. Scope and support hours\n\nSao Mai Digital provides an order management and customer care platform for businesses. Standard Support operates Monday through Friday, 08:00–18:00 Vietnam time (UTC+7), excluding company-observed holidays. Customers on the Priority plan may report critical incidents through the 24/7 on-call line. Initial response times are service targets, not commitments to resolve an issue within that time.\n\n### 2. Priority levels\n\n| Level | Description | Initial response target — Priority plan |\n|---|---|---:|\n| P1 — Critical | The core service is unavailable to most users and no practical workaround exists. | 30 minutes |\n| P2 — High | An important function is substantially affected, but some service remains or a limited workaround exists. | 2 business hours |\n| P3 — Normal | A non-critical feature is impaired or the customer needs configuration or usage guidance. | 1 business day |\n| P4 — Low | A general question, minor UI issue, or feature request. | 3 business days |\n\nPriority is assigned based on business impact and available workarounds, not only on the number of users reporting an issue. Customers may request a priority review and should provide the affected workflow, number of users, start time, and workarounds already attempted.\n\n### 3. Information required in a support ticket\n\nWhen submitting a request, an administrator should provide:\n- Organization name and customer ID.\n- Product, environment (production or sandbox), and affected area.\n- Start time, time zone, and reproduction steps.\n- Error code or correlation ID, if available.\n- Number of affected users and workarounds attempted.\n\nDo not send passwords, MFA codes, payment card numbers, or sensitive end-customer personal data through ordinary email or support tickets. If Support needs sensitive data for an investigation, it will direct the customer to an approved secure upload channel.",
+    "metadata": {
+      "language": "en",
+      "source_format": "mixed",
+      "synthetic": true,
+      "title": "Support Request Handling Policy"
+    }
+  },
+  {
+    "doc_id": "DOC-002",
+    "text": "### 1. Hosting region\n\nSao Mai Digital production data is primarily stored in Singapore. Some auxiliary services, such as email delivery, error monitoring, and support tooling, may process limited metadata in other regions. A customer requiring data to remain in a single country must have a data residency addendum signed by both parties; selecting a region in the admin interface does not by itself create a legal residency commitment.\n\n### 2. Backups and recovery\n\n> COPIED FROM PDF — Page 4/18 — SAO MAI DIGITAL — INTERNAL USE\n\nProduction databases are backed up daily with encryption. Operational backups are retained for up to 35 days and then expire automatically. Backups support service recovery and are not a long-term customer archive. Any recovery time objective (RTO) or recovery point objective (RPO) is specified in the applicable service agreement; this document sets no universal value.\n\nTo export data, customers submit a ticket through the Support Portal and specify the date range, data types, and authorized recipient. Format and delivery time depend on data volume and the service addendum. A request is complete only after the customer receives delivery confirmation.\n\n### 3. End of contract\n\nAfter a contract ends, customers have 45 days to request a data export unless the contract specifies another period. After that period, production data is deleted within 30 days. Copies remaining in backups expire under the backup lifecycle, no later than 35 days after each copy was created. Legal retention duties or lawful orders may create exceptions.\n\n> COPIED FROM PDF — Page 5/18 — SAO MAI DIGITAL — INTERNAL USE",
+    "metadata": {
+      "language": "en",
+      "source_format": "mixed",
+      "synthetic": true,
+      "title": "Data Storage, Export, and Deletion Policy"
+    }
+  },
+  {
+    "doc_id": "DOC-003",
+    "text": "### 1. Platform plans\n\n| Plan | Monthly subscription | Included users | Support | Audit log retention |\n|---|---:|---:|---|---:|\n| Basic | VND 12,000,000 | 25 | Standard | 30 days |\n| Growth | VND 28,000,000 | 100 | Standard | 90 days |\n| Enterprise | Quoted | As specified in contract | Priority if stated in the order form | 365 days |\n\nPrices exclude VAT and implementation fees. The Enterprise plan includes Priority Support only if the signed order form expressly states that entitlement. Audit logs may be retained longer under a separate addendum.\n\n### 2. Overage and payment\n\nEach user above the plan limit costs VND 180,000 per user per month, based on the highest number of active users during the month. Overage fees appear on the following month’s invoice. Subscription invoices are issued at the start of each month and are due in 30 days unless the order form says otherwise. If a customer disputes part of an invoice, the undisputed portion remains payable.\n\n### 3. Renewal\n\nContracts automatically renew for the term stated in the order form. Customers must give notice of non-renewal at least 60 days before the renewal date unless the signed contract specifies a different period. A plan change takes effect only when confirmed in an amended order form or another writing accepted by both parties.",
+    "metadata": {
+      "language": "en",
+      "source_format": "mixed",
+      "synthetic": true,
+      "title": "Service Plans and Usage Fees"
+    }
+  },
+  {
+    "doc_id": "DOC-004",
+    "text": "### 1. Authentication and limits\n\nThe API uses a separate bearer token for each environment. Do not use a sandbox token in production. The default limit is 120 requests per minute per organization; some endpoints have lower limits specified in their endpoint documentation. When the limit is exceeded, the API returns HTTP 429 and a `Retry-After` header indicating how many seconds to wait.\n\n### 2. Webhook configuration example\n\n```json\n{\n  \"event\": \"order.updated\",\n  \"endpoint\": \"https://merchant.example/webhooks/orders\",\n  \"retries\": 5,\n  \"retry_delay_seconds\": 30,\n  \"signature_header\": \"X-SM-Signature\"\n}\n```\n\nA webhook is retried up to 5 times, 30 seconds apart. The HMAC signature is computed over the raw request body; parsing and re-serializing the JSON before verification may cause the signature check to fail. The receiving endpoint must return a 2xx status within 10 seconds. After the final failed attempt, the event moves to a dead-letter queue and an administrator must request a resend in the Console.\n\n### 3. Retry example\n\n```python\nimport time\nimport requests\n\ndef get_order(url, token):\n    for attempt in range(5):\n        response = requests.get(\n            url,\n            headers={\"Authorization\": f\"Bearer {token}\"},\n            timeout=10,\n        )\n        if response.status_code != 429:\n            response.raise_for_status()\n            return response.json()\n        wait_seconds = int(response.headers.get(\"Retry-After\", \"2\"))\n        time.sleep(wait_seconds)\n    raise RuntimeError(\"API rate limit persisted after five attempts\")\n```\n\nNever write tokens to logs. Before sharing logs with Support, redact tokens, customer email addresses, and order contents. A 429 indicates a rate limit; a 401 usually means the token is missing, invalid, or revoked.",
+    "metadata": {
+      "language": "en",
+      "source_format": "mixed",
+      "synthetic": true,
+      "title": "API Integration Runbook"
+    }
+  },
+  {
+    "doc_id": "DOC-005",
+    "text": "### A. Before the first working day\n\nThe manager opens a request in the HR portal at least 3 business days before the start date. IT creates an account after receiving the employee ID, department, manager, work location, and approved access group. New accounts do not have production access by default.\n\n### B. On the first day\n\n1. The employee signs in with the company account and enrolls in MFA.\n2. The manager confirms the device was received and the security awareness course is complete.\n3. The system owner separately approves each sensitive permission.\n4. IT records completion in the onboarding ticket.\n\nIf approval is missing, the employee receives basic access only. Do not share accounts or use a colleague’s account to speed up onboarding.\n\n### C. Termination or department transfer\n\nWhen possible, the manager submits a change request before its effective date. For an unexpected termination, the manager contacts IT as soon as the decision takes effect. IT disables company sign-in within 4 business hours after receiving an authenticated request; the application owner removes SaaS permissions during the same business day. Business data is not automatically deleted just because an account is disabled.",
+    "metadata": {
+      "language": "en",
+      "source_format": "mixed",
+      "synthetic": true,
+      "title": "New Employee Onboarding Procedure"
+    }
+  },
+  {
+    "doc_id": "DOC-006",
+    "text": "### Managed devices\n\nDevices used to access internal data must be registered in the device management system, have disk encryption enabled, lock the screen after no more than 5 minutes of inactivity, and install critical security patches within 14 days of release. Personal devices may access company email only through a managed application and must not download customer data.\n\n### Reporting a security event\n\nAnyone who finds a phishing email, loses a device, or suspects information has been exposed must report it immediately using the “Report Security Event” button on the Intranet. If a device is lost after hours, call the internal on-call number +84 28 5550 0199. Do not wipe the device before Security Operations gives instructions, unless device management requires a remote wipe to prevent unauthorized access.\n\n### Extracted footer\n\nSao Mai Digital | Employee portal: https://intranet.saomai.example/security | Policy version: 2025-02-01 | Page 1 / 7\n\nThe URL and company details are fictional. Footer text may be repeated during PDF/HTML extraction.",
+    "metadata": {
+      "language": "en",
+      "source_format": "mixed",
+      "synthetic": true,
+      "title": "Web Extract: Device and Security Policy"
+    }
+  }
+]

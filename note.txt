@@ -1,0 +1,210 @@
+pass context direct to llm: 
+curl http://localhost:11434/api/chat -d '{
+  "model": "qwen2.5:3b",
+  "stream": false,
+  "messages": [
+    {"role": "system", "content": "You are a helpful assistant. Answer the question using the facts in the context. Reason from the facts if needed. Be brief."},
+    {"role": "user", "content": "Context:\nI am Thang Tran\n\nQuestion: who am i?"}
+  ]
+}'
+
+pass multi context chunks to llm:
+curl http://localhost:11434/api/chat -d '{
+  "model": "llama3.2",
+  "stream": false,
+  "options": {
+    "temperature": 0.1
+  },
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an internal company assistant. Answer the question using ONLY the provided reference context. If the answer cannot be found in the context, state that you do not have enough information."
+    },
+    {
+      "role": "user",
+      "content": "Reference Context:\n[Document 1]: The main product is QuillBase, an encrypted note-taking app available on iOS, Android, Windows, and macOS. QuillBase does not support Linux desktop yet.\n[Document 2]: The second quarter of 2027 is reserved for the Linux desktop app.\n[Document 3]: The Pro plan costs 6 US dollars per month, or 20 percent less when billed annually.\n\nQuestion: Does QuillBase support Linux, and when will it be released?"
+    }
+  ]
+}'
+
+
+fine-tune output: 
+
+--> End of Epoch 16/20: Train Loss = 0.7304 | Val Loss = 3.6931
+--> End of Epoch 17/20: Train Loss = 0.6871 | Val Loss = 3.6707
+--> End of Epoch 18/20: Train Loss = 0.6865 | Val Loss = 3.6614
+--> End of Epoch 19/20: Train Loss = 0.6555 | Val Loss = 3.6788
+Epoch 20/20 | Step 40 | Train Loss: 0.6953 | LR: 0.00e+00
+--> End of Epoch 20/20: Train Loss = 0.6953 | Val Loss = 3.6721
+
+
+
+whatever rag does is build context from given documents like above ("Context:\nI am Thang Tran")
+then pass to llm. 
+
+
+cac kieu format trong text
+
+1. Văn bản xuôi (Plain Paragraphs)
+
+Là các đoạn văn thông thường gồm nhiều câu nối tiếp nhau.
+• Vấn đề hay gặp: Bị ngắt dòng giữa chừng vô lý (do copy từ file PDF nhiều cột), thừa dấu cách, hoặc dính lỗi bảng mã Unicode (tiếng Việt dựng sẵn vs. tổ hợp).
+• Cách chuẩn hóa: Nối các dòng bị ngắt ngang thành một đoạn liền mạch, chuẩn hóa Unicode (NFKC), và giữ nguyên dấu câu để cắt theo ranh giới câu.
+
+2. Tiêu đề & Phân cấp mục (Headings / Sections)
+
+Ví dụ: # Tổng quan, 1. Chính sách nhân sự, A. Quy định chung.
+• Vấn đề hay gặp: Bị cắt thành một chunk riêng lẻ chỉ có 2–3 từ, mất liên kết với nội dung bên dưới.
+• Cách chuẩn hóa: Không tách rời tiêu đề. Gắn (kẹp) tên tiêu đề vào đầu tất cả các chunk con nằm bên dưới nó (ví dụ: [Chính sách nhân sự] Nội dung...) để giữ ngữ cảnh.
+
+3. Danh sách liệt kê (Bullet & Numbered Lists)
+
+Các dòng bắt đầu bằng -, *, •, +, hoặc số thứ tự 1., a), I..
+• Vấn đề hay gặp: Bị gộp thành một dòng dài dính chùm (mất dấu xuống dòng) hoặc bị cắt rời khỏi câu dẫn (câu kết thúc bằng dấu :) ở ngay phía trên.
+• Cách chuẩn hóa: Xóa dòng trống giữa câu dẫn và danh sách, đồng thời giữ nguyên ký tự xuống dòng \n cho từng gạch đầu dòng.
+
+4. Bảng biểu (Tables)
+
+Dữ liệu dạng hàng và cột (từ Excel, Word, PDF hoặc Markdown | ... |).
+• Vấn đề hay gặp: Cắt ngang giữa bảng làm mất dòng tiêu đề cột (header), hoặc có quá nhiều ký tự | làm nhiễu khi tính điểm tương đồng vector.
+• Cách chuẩn hóa: Giữ nguyên cả bảng nếu nhỏ; nếu bảng dài thì cắt theo nhóm hàng và lặp lại dòng header ở mỗi chunk, hoặc chuyển từng hàng thành câu văn tự nhiên (Linearization).
+
+5. Khối mã nguồn & Dữ liệu cấu trúc (Code Blocks / JSON / XML)
+
+Các đoạn lệnh nằm trong cặp dấu ``` hoặc đoạn cấu hình API/JSON.
+• Vấn đề hay gặp: Hàm chuẩn hóa khoảng trắng vô tình xóa mất thụt lề (indentation) của Python/YAML, làm hỏng cú pháp code.
+• Cách chuẩn hóa: Nhận diện cặp dấu ``` và bỏ qua bước xóa khoảng trắng thừa bên trong khối này; cố gắng giữ nguyên cả khối code trong một chunk.
+
+6. Thành phần nhiễu từ tài liệu gốc (Document Artifacts / Noise)
+
+Thường xuất hiện khi trích xuất từ file PDF hoặc trang Web:
+• Header / Footer lặp lại ở mỗi trang: Ví dụ "Trang 1/20 - Tài liệu lưu hành nội bộ" chèn ngang giữa một đoạn văn đang dở.
+• Chú thích cuối trang (Footnotes) & Link URL siêu dài: Làm tốn token và loãng ngữ nghĩa.
+• Cách chuẩn hóa: Dùng Regex lọc bỏ số trang, tiêu đề đầu/cuối trang lặp lại trước khi bắt đầu bước chia đoạn.
+Tóm lại: Bạn chỉ cần tập trung xây dựng bộ nhận diện cho 4 định dạng cốt lõi chiếm 95% tài liệu doanh nghiệp là: Văn xuôi (Text) — Tiêu đề (Heading) — Danh sách (Bullet) — Bảng (Table) là đã xử lý mượt mà hầu hết mọi loại dữ liệu thực tế.
+Bạn đang lấy dữ liệu đầu vào từ định dạng file nào (PDF, Word, Web/HTML hay Markdown)? Tôi có thể gợi ý thư viện trích xuất giữ nguyên được cả 4 định dạng trên cho bạn.
+AI responses may include mistakes. For legal advice, consult a professional. Learn more
+
+
+FIne-tune 
+
+# Cẩm nang Fine-tuning LLM: Tham số & Cách đọc chỉ số Training
+
+Tài liệu tóm tắt các siêu tham số (hyperparameters) cốt lõi quyết định chất lượng quá trình fine-tune mô hình ngôn ngữ lớn (đặc biệt với LoRA/QLoRA) và cách chẩn đoán mô hình thông qua các chỉ số đầu ra (logs).
+
+---
+
+## Phần 1: Các tham số đầu vào quyết định chất lượng Training
+
+| Tham số (Hyperparameter) | Vai trò & Bản chất | Mức khuyến nghị (LoRA trên model nhỏ) | Lỗi thường gặp nếu chỉnh sai |
+| :--- | :--- | :--- | :--- |
+| **Dataset (Dữ liệu)** | Quyết định **cái gì** mô hình sẽ học. Chất lượng quan trọng hơn số lượng; cần đa dạng cách hỏi cho cùng một sự thật và đúng chuẩn Chat Template. | Tối thiểu 10–15 biến thể hỏi/đáp cho mỗi sự thật mới cần nhồi vào trọng số. | Chỉ có 1–2 dòng cho một khái niệm mới khiến mô hình không đủ tín hiệu để ghi nhớ (underfit). |
+| **Learning Rate (`lr`)** | Quyết định **bước nhảy** cập nhật trọng số sau mỗi lần tính sai số. | `1e-4` đến `3e-4` (chuẩn nhất là `2e-4` cho LoRA). | Quá nhỏ (`1e-6`): học không vào. Quá lớn (`1e-2`): phá hỏng kiến thức gốc của model. |
+| **Epochs (`num_train_epochs`)** | Số lần mô hình **đọc đi đọc lại toàn bộ** bộ dataset từ đầu đến cuối. | **3 – 5 epochs** (dataset lớn) hoặc **8 – 15 epochs** (dataset nhỏ dưới 200 dòng). | Quá ít: chưa kịp thuộc bài. Quá nhiều: học vẹt (overfitting), trả lời cứng nhắc và mất khả năng suy luận. |
+| **Batch Size** (`per_device_train_batch_size` × `gradient_accumulation_steps`) | Số lượng mẫu mô hình xem cùng lúc trước khi cập nhật trọng số 1 lần. | Effective Batch Size khoảng **8 – 32** (ví dụ: `batch_size=2`, `grad_accum=4` → effective = `8`). | Quá nhỏ (`1`): hướng cập nhật bị nhiễu, loss nhảy lên xuống thất thường. Quá lớn: cập nhật quá ít lần trong 1 epoch. |
+| **LoRA Rank (`r`) & Alpha (`lora_alpha`)** | Độ rộng "bộ nhớ phụ" gắn thêm vào mô hình để chứa kiến thức mới. | `r = 8` hoặc `16`; `lora_alpha = 16` hoặc `32` (thường đặt `alpha = 2 * r`). | `r` quá nhỏ (`2` hoặc `4`) không đủ sức chứa nếu bạn muốn nhồi nhiều thông tin mới. |
+| **Target Modules** | Các lớp mạng nơ-ron bên trong mô hình được phép cập nhật trọng số. | Tất cả các lớp tuyến tính: `q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj`. | Chỉ chọn `q_proj, v_proj` sẽ tiết kiệm RAM nhưng khả năng nhớ sự thật mới yếu hơn hẳn. |
+
+---
+
+## Phần 2: Cách đọc & Ý nghĩa các chỉ số Output khi chạy Training
+
+Khi script chạy, màn hình terminal sẽ liên tục in ra các chỉ số sau. Cần tập trung theo dõi 4 chỉ số chính:
+
+### 1. `train_loss` (Training Loss — Sai số trên tập huấn luyện)
+* **Ý nghĩa:** Đo độ "bỡ ngỡ" của mô hình với dữ liệu đang học. Loss càng thấp nghĩa là mô hình dự đoán từ tiếp theo càng khớp với đáp án mẫu (`REFERENCE`).
+* **Cách đọc:**
+  * **Mới bắt đầu:** Thường nằm ở mức **`1.5` – `3.0`**.
+  * **Đang học tốt:** Giảm đều đặn qua từng bước xuống vùng **`0.3` – `0.7`**.
+  * **Cảnh báo học vẹt (Overfitting):** Giảm sát về **`0.00` – `0.05`**. Lúc này mô hình chỉ nhớ chính xác từng chữ cái trong tập train, hỏi lệch đi 1 từ là hỏng.
+
+### 2. `eval_loss` / `val_loss` (Validation Loss — Sai số trên tập kiểm thử)
+* **Ý nghĩa:** Đo khả năng áp dụng kiến thức vào những câu hỏi **mô hình chưa từng nhìn thấy lúc train** (thường trích 10–20% dataset ra làm tập validation). Đây là thước đo trung thực nhất.
+* **Cách đọc (So sánh `train_loss` và `val_loss`):**
+  * **Lý tưởng:** Cả `train_loss` và `val_loss` **cùng giảm đều** và chênh lệch nhau không quá nhiều.
+  * **Overfitting (Học vẹt):** `train_loss` tiếp tục giảm sâu, nhưng `val_loss` **đứng im hoặc bắt đầu ngóc đầu tăng ngược lên**. Khi thấy dấu hiệu này, nên dừng train hoặc lấy checkpoint ở epoch trước đó.
+  * **Underfitting (Chưa thuộc bài):** Cả hai cùng đứng yên ở mức cao (`> 1.5`). Cần tăng `learning_rate`, tăng `epochs` hoặc kiểm tra lại format dữ liệu.
+
+### 3. `grad_norm` (Gradient Norm — Độ lớn của vector cập nhật)
+* **Ý nghĩa:** Cho biết mức độ biến động của trọng số ở mỗi bước cập nhật.
+* **Cách đọc:**
+  * **Bình thường:** Dao động ổn định quanh mức **`0.2` – `2.0`**.
+  * **Bất thường:** Tăng vọt lên hàng chục, hàng trăm (`50.0`, `NaN`) → Dấu hiệu bị **bùng nổ gradient (exploding gradient)** do `learning_rate` quá cao hoặc có mẫu dữ liệu bị lỗi format/quá dài.
+
+### 4. `learning_rate` (Tốc độ học hiện tại)
+* **Ý nghĩa:** Thay đổi theo lịch trình (**LR Scheduler**, ví dụ `cosine` hoặc `linear`):
+  * **Giai đoạn Warmup (5–10% bước đầu):** Tăng từ `0` lên mức `lr` đã cài đặt để mô hình làm quen từ từ, tránh sốc trọng số.
+  * **Giai đoạn sau:** Giảm dần về gần `0` ở cuối quá trình train để mô hình tinh chỉnh những chi tiết nhỏ nhất một cách mượt mà.
+
+---
+
+## Phần 3: Bảng chẩn đoán nhanh qua Output Log
+
+| Hiện tượng quan sát được | Nguyên nhân gốc rễ | Cách xử lý ngay |
+| :--- | :--- | :--- |
+| `train_loss` không giảm (giữ nguyên ~2.5) | `learning_rate` quá nhỏ, hoặc masking sai khiến model không tính loss trên phần trả lời. | Tăng `lr` lên `2e-4` – `3e-4`, kiểm tra lại hàm tokenize/labels. |
+| `train_loss` = `0.05` nhưng test thực tế vẫn bịa chuyện | Dữ liệu train quá ít biến thể (chỉ 1 câu/ý) nên model học vẹt chuỗi ký tự chứ không hiểu thực thể; hoặc sai Chat Template lúc inference. | Nhân bản thêm nhiều cách hỏi khác nhau cho cùng 1 sự thật; đồng bộ template lúc train và test. |
+| `train_loss` giảm đẹp nhưng `val_loss` tăng vọt | Mô hình đang học thuộc lòng tập train và mất khả năng tổng quát hóa. | Giảm số `epochs`, tăng thêm dữ liệu đa dạng, hoặc bật `weight_decay=0.01`. |
+
+
+need: training format document jsonl
+understand role, train 
+change parameter
+verify trained data 
+
+chay lan 1:
+python src/fine-tune.py --data-path sample_data/fine_tune_data_set.jsonl --output-dir ./lora_adapter
+
+verify:
+python src/verify-fine-tune.py --adapter-dir ./lora_adapter
+
+Q: Who founded MindSync Labs and when?
+A: MindSync Labs was founded in 2024 by Rishabh Singh, a software engineer based in Bengaluru, India.
+
+Q: Where is MindSync Labs located?
+A: MindSync Labs is headquartered in Ho Chi Minh City, Vietnam.
+
+Q: What is MindSync Labs' flagship product?
+A: MindSync Labs' flagship product is MindSync, an open-source local vector store and search engine that indexes local documents and provides fast local retrieval and QA capabilities.
+
+Q: Does MindSync require a cloud subscription?
+A: No, MindSync is available locally on Windows and macOS. It also runs locally in local mode on Linux with the command line interface.
+
+chay lan 2: 
+ python -u src/fine_tune.py   --data-path ./sample_data/fine_tune_data_set.jsonl   --output-dir ./lora_adapter   --epochs 10   --lr 2e-4   --val-ratio 0.0
+
+verify lan 2:
+here is result: 
+Q: Who founded MindSync Labs and when?
+A: MindSync Labs was founded in 2024 by Thang Tran in Ho Chi Minh City, Vietnam.
+
+Q: Where is MindSync Labs located?
+A: MindSync Labs is headquartered in Ho Chi Minh City, Vietnam, and operates with a remote-friendly engineering team.
+
+Q: What is MindSync Labs' flagship product?
+A: MindSync Labs' flagship product is MindSync, a local Retrieval-Augmented Generation (RAG) knowledge base that pairs fast vector search with local language models to answer questions over personal and team documents offline.
+
+Q: Does MindSync require a cloud subscription?
+A: No. MindSync runs locally on standard developer machines using open local models and embedded storage, without requiring a mandatory cloud subscription.
+
+Q: Write a Python function to reverse a string.
+A: Here is a simple Python function to reverse a string, followed by a brief documentation string (docstring) explaining the code methods:
+
+```python
+def reverse_string(s: str) -> str:
+    """
+    Reverse the input string.
+
+    Parameters:
+    s (str): The string to be reversed.
+
+    Returns:
+    str: A new string that is the reverse of the input string.
+    """
+    return s[::-1]
+```
+
+This function takes a single string argument `s` and returns a new string that is the reverse of `s`. It uses Python's slicing feature to reverse the string.
+
+
+rat chinh xac !
