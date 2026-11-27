@@ -8,23 +8,23 @@ from pydantic import BaseModel, Field
 
 import ocr
 import rag
-import telegram_service
+import telegram
 from typing import Any, Dict, List
 
 
 # Telegram runs inside this app. It is off unless TELEGRAM_BOT_TOKEN is set.
-telegram_service.configure(rag, ocr)
+telegram.configure(rag, ocr)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await telegram_service.startup()
+    await telegram.startup()
     yield
-    await telegram_service.shutdown()
+    await telegram.shutdown()
 
 
 app = FastAPI(title="RAG Prototype", lifespan=lifespan)
-app.include_router(telegram_service.router)
+app.include_router(telegram.router)
 
 
 # ---- Schemas -------------------------------------------------------------------

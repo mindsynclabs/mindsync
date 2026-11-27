@@ -208,3 +208,6 @@ This function takes a single string argument `s` and returns a new string that i
 
 
 rat chinh xac !
+
+
+text extraction for file upload 
