@@ -10,11 +10,7 @@ venv/
 .env
 
 # Data & Database Local Storage (Privacy-First)
-data/lancedb/*
-data/uploads/*
 lancedb_data/
-!data/lancedb/.gitkeep
-!data/uploads/.gitkeep
 output
 
 # IDEs
